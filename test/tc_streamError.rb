@@ -96,6 +96,7 @@ class ConnectionErrorTest < Test::Unit::TestCase
         assert_equal(nil, exc)
         assert_equal(Jabber::Stream, o.class)
       end
+      p exc.class
       error += 1
     end
     @server.puts(STREAM)

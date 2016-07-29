@@ -242,7 +242,8 @@ Gem::Specification.new do |s|
   s.required_rubygems_version = ">= 0"
   s.rubyforge_project = "xmpp4r"
   s.rubygems_version = "2.4.1"
+  s.add_runtime_dependency 'ox', '~> 2.4'
   s.specification_version = 4
   s.summary = "XMPP/Jabber library for ruby"
-  s.version = "0.5.7"
+  s.version = "0.5.8"
 end

@@ -18,6 +18,9 @@ class MockListener
   def parse_failure(exception)
     raise exception
   end
+
+  def parser_end
+  end
 end
 
 class StreamParserTest < Test::Unit::TestCase
@@ -33,12 +36,12 @@ class StreamParserTest < Test::Unit::TestCase
 
   def parse_simple_helper(fixture)
     parser = StreamParser.new(STREAM + fixture, @listener)
-    
+
     begin
-      parser.parse
+      parser.parse_new
     rescue Jabber::ServerDisconnected => e
     end
-    
+
     yield parse_with_rexml(fixture)
   end
 
@@ -89,7 +92,7 @@ class StreamParserTest < Test::Unit::TestCase
   def test_entity_escaping1
     parse_simple_helper( "<a>&apos;&amp;&quot;</a>" ) do |desired|
       assert_equal "'&\"", @listener.received.text
-      assert_equal "<a>&apos;&amp;&quot;</a>", @listener.received.to_s
+      assert_equal "<a>&#39;&amp;&quot;</a>", @listener.received.to_s
     end
   end
 
@@ -123,10 +126,10 @@ class StreamParserTest < Test::Unit::TestCase
     parser = StreamParser.new(STREAM + "<stream:stream xmlns:stream='http://etherx.jabber.org/streams' to='foobar'>", @listener)
 
     begin
-      parser.parse
+      parser.parse_new
     rescue Jabber::ServerDisconnected => e
     end
-    
+
     assert_equal 'foobar', @listener.received.attributes['to']
   end
 end
