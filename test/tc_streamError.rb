@@ -30,8 +30,8 @@ class ConnectionErrorTest < Test::Unit::TestCase
   end
 
   def teardown
-    @conn.close if not @conn.closed?
-    @server.close if not @conn.closed?
+    @conn.close if @conn && !@conn.closed?
+    @server.close if @conn && !@conn.closed?
   end
 
   def test_connectionError_start_withexcblock
@@ -41,7 +41,7 @@ class ConnectionErrorTest < Test::Unit::TestCase
       # strange exception, it's caused by REXML, actually
       assert_kind_of(StandardError, e)
       assert_equal(Jabber::Stream, o.class)
-      assert_equal(:start, w)
+      assert_equal(:start_new, w)
       error = true
     end
     assert(!error)
@@ -50,7 +50,7 @@ class ConnectionErrorTest < Test::Unit::TestCase
       conn = TCPSocket.new('localhost', 1)
     rescue
     end
-    @stream.start(conn)
+    @stream.start_new(conn)
     sleep 0.2
     assert(error)
     @server.close
@@ -60,7 +60,7 @@ class ConnectionErrorTest < Test::Unit::TestCase
   def test_connectionError_parse_withexcblock
     @stream = Stream.new
     error = false
-    @stream.start(@conn)
+    @stream.start_new(@conn)
     @stream.on_exception do |e, o, w|
       if w == :disconnected
         assert_equal(nil, e)
@@ -96,7 +96,6 @@ class ConnectionErrorTest < Test::Unit::TestCase
         assert_equal(nil, exc)
         assert_equal(Jabber::Stream, o.class)
       end
-      p exc.class
       error += 1
     end
     @server.puts(STREAM)
@@ -115,7 +114,7 @@ class ConnectionErrorTest < Test::Unit::TestCase
 
   def test_connectionError_send_withoutexcblock
     @stream = Stream.new
-    @stream.start(@conn)
+    @stream.start_new(@conn)
     @server.puts(STREAM)
     @server.flush
     assert_raise(IOError) do

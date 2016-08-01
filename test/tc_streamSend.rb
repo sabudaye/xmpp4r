@@ -18,7 +18,7 @@ class StreamSendTest < Test::Unit::TestCase
     thServer = Thread.new { @server = @servlisten.accept }
     @iostream = UNIXSocket.new(@tmpfilepath)
     @stream = Stream.new
-    @stream.start(@iostream)
+    @stream.start_new(@iostream)
 
     thServer.join
   end

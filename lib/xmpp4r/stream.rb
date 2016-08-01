@@ -100,6 +100,45 @@ module Jabber
       @status = CONNECTED
     end
 
+    ##
+    # Start the XML parser on the fd
+    def start_new(fd)
+      @stream_mechanisms = []
+      @stream_features = {}
+
+      @fd = fd
+      @parser = StreamParser.new(@fd, self)
+      @parser_thread = Thread.new do
+        Thread.current.abort_on_exception = true
+        begin
+          @parser.parse_new
+          Jabber::debuglog("DISCONNECTED\n")
+
+          if @exception_block
+            Thread.new { close!; @exception_block.call(nil, self, :disconnected) }
+          else
+            close!
+          end
+        rescue Exception => e
+          Jabber::warnlog("EXCEPTION:\n#{e.class}\n#{e.message}\n#{e.backtrace.join("\n")}")
+
+          if @exception_block
+            Thread.new do
+              Thread.current.abort_on_exception = true
+              close
+              @exception_block.call(e, self, :start_new)
+            end
+          else
+            Jabber::warnlog "Exception caught in Parser thread! (#{e.class})\n#{e.backtrace.join("\n")}"
+            close!
+            raise
+          end
+        end
+      end
+
+      @status = CONNECTED
+    end
+
     def stop
       @parser_thread.kill
       @parser = nil
@@ -588,9 +627,9 @@ module Jabber
         end
       end
 
-      # Order Matters here! If this method is called from within 
-      # @parser_thread then killing @parser_thread first would 
-      # mean the other parts of the method fail to execute. 
+      # Order Matters here! If this method is called from within
+      # @parser_thread then killing @parser_thread first would
+      # mean the other parts of the method fail to execute.
       # That would be bad. So kill parser_thread last
       @fd.close if @fd and !@fd.closed?
       @status = DISCONNECTED

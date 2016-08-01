@@ -1,14 +1,16 @@
 PATH
   remote: .
   specs:
-    xmpp4r (0.5.7)
-      ox (~> 2.4)
+    xmpp4r (0.5.8)
+      nokogiri (~> 1.6)
 
 GEM
   remote: https://rubygems.org/
   specs:
     json (1.8.1)
-    ox (2.4.3)
+    mini_portile2 (2.0.0)
+    nokogiri (1.6.7.2)
+      mini_portile2 (~> 2.0.0.rc2)
     rake (10.3.2)
     rdoc (3.12.2)
       json (~> 1.4)

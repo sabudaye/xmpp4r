@@ -5,32 +5,52 @@
 require 'rexml/parsers/sax2parser'
 require 'rexml/source'
 require 'xmpp4r/rexmladdons'
-require 'ox'
+require 'nokogiri'
 require 'cgi'
 
 module Jabber
-  class SaxHandler < ::Ox::Sax
+  class SaxHandler < Nokogiri::XML::SAX::Document
 
     def initialize(listener)
       @listener = listener
       @current = nil
+      @current_text = ''
     end
 
-    def start_element(name)
-       e = REXML::Element.new(name.to_s)
-       @current = @current.nil? ? e : @current.add_element(e)
+    def start_element_namespace(name, attrs, prefix, uri, ns)
+      begin
+        e = REXML::Element.new(name.to_s)
+        if attrs.kind_of? Array
+          unnormalized_attributes = []
+          attrs.each do |value|
+            if value.kind_of?(Nokogiri::XML::SAX::Parser::Attribute)
+              unnormalized_attributes << [value.localname, REXML::Text::unnormalize(value.value)]
+            else
+              unnormalized_attributes << [value[0], REXML::Text::unnormalize(value[1])]
+            end
+          end
+          e.add_attributes unnormalized_attributes
+        end
 
-       # Handling <stream:stream> not only when it is being
-       # received as a top-level tag but also as a child of the
-       # top-level element itself. This way, we handle stream
-       # restarts (ie. after SASL authentication).
-       if (@current.name.to_s == 'stream' || @current.name.to_s == 'stream:stream') && !@current.parent.nil?
-         @current = REXML::Element.new(name.to_s)
-       end
+        @current = @current.nil? ? e : @current.add_element(e)
+        @current_text = ''
+        @listener.receive(@current) if @current && @current.name.to_s == 'stream'
+
+        # Handling <stream:stream> not only when it is being
+        # received as a top-level tag but also as a child of the
+        # top-level element itself. This way, we handle stream
+        # restarts (ie. after SASL authentication).
+        if @current.name.to_s == 'stream' && !@current.parent.nil?
+          @current = REXML::Element.new(name.to_s)
+        end
+      rescue Nokogiri::XML::SyntaxError, REXML::ParseException => e
+        @listener.parse_failure(e)
+      end
     end
 
-    def end_element(name)
-      if (name.to_s == 'stream:stream' || name.to_s == 'stream') && @current.parent.nil?
+    def end_element_namespace(name, prefix, uri)
+      save_text
+      if name.to_s == 'stream' && @current.parent.nil?
         @listener.parser_end
       else
         @listener.receive(@current)
@@ -38,30 +58,37 @@ module Jabber
       end
     end
 
-    def attr(name, str)
-      @current.add_attribute(name.to_s, str) if @current
+    def characters(str)
+      @current_text << str
     end
 
-    def attrs_done
-      @listener.receive(@current) if @current.name.to_s == 'stream' || @current.name.to_s == 'stream:stream'
+    def cdata_block(str)
+      save_text
+      begin
+        @current.add(REXML::CData.new(str)) if @current
+      rescue Nokogiri::XML::SyntaxError, REXML::ParseException => e
+        @listener.parse_failure(e)
+      end
     end
 
-    def text(str)
-      @current.add(REXML::Text.new(CGI::escapeHTML(str), @current.whitespace, nil, true)) if @current
-    end
-
-    def cdata(str)
-      @current.add(REXML::CData.new(str)) if @current
-    end
-
-    def abort(name)
+    def end_document
       raise Jabber::ServerDisconnected, "Server Disconnected!"
     end
 
-    def error(message, line, column)
-      # FIXME
-      # it looks loke we need to know name of error's class
-      raise REXML::ParseException, message if message != "Start End Mismatch: element 'stream:stream' not closed"
+    def error(str)
+      return if str.include?("Premature end of data in tag stream")
+      raise REXML::ParseException, str
+    end
+
+    private
+
+    def save_text
+      begin
+        @current.add(REXML::Text.new(CGI::escapeHTML(@current_text), @current.whitespace, nil, true)) if @current && @current_text != ''
+        @current_text = ''
+      rescue REXML::ParseException => e
+        @listener.parse_failure(e)
+      end
     end
   end
   ##
@@ -86,16 +113,17 @@ module Jabber
     end
 
 
-    def parse
+    def parse_new
       handler = SaxHandler.new(@listener)
       begin
-        Ox.sax_parse(handler, @stream)
-      rescue Ox::ParseError, REXML::ParseException => e
+        parser = Nokogiri::XML::SAX::Parser.new(handler)
+        parser.parse(@stream)
+      rescue Nokogiri::XML::SyntaxError, REXML::ParseException => e
         @listener.parse_failure(e)
       end
     end
 
-    def parse_old
+    def parse
       @started = false
       begin
         parser = REXML::Parsers::SAX2Parser.new @stream

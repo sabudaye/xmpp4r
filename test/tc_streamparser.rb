@@ -110,17 +110,17 @@ class StreamParserTest < Test::Unit::TestCase
     end
   end
 
-=begin
-  ##
-  # FIXME:
-  # http://www.germane-software.com/projects/rexml/ticket/165
-  def test_unbound_prefix
-    fixture = "<message><soe:instantMessage/></message>"
-    parser = StreamParser.new(STREAM + fixture, @listener)
-
-    assert_nothing_raised { parser.parse }
-  end
-=end
+  # def test_unbound_prefix
+  #   fixture = "<message><soe:instantMessage/></message>"
+  #   parser = StreamParser.new(STREAM + fixture, @listener)
+  #
+  #   begin
+  #     parser.parse_new
+  #   rescue Jabber::ServerDisconnected => e
+  #   end
+  #
+  #   assert_equal "<message><instantMessage/></message>", @listener.received.to_s
+  # end
 
   def test_stream_restart
     parser = StreamParser.new(STREAM + "<stream:stream xmlns:stream='http://etherx.jabber.org/streams' to='foobar'>", @listener)
